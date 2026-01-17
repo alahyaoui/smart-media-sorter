@@ -1,4 +1,4 @@
-#!/bin/bash
+bash ./smart-media-sorter/quickstart.sh#!/bin/bash
 # Quick start script for Smart Media Sorter
 
 echo "=================================================="
@@ -64,16 +64,19 @@ else
         echo ""
         echo "🚀 Running LIVE sort (moving files)..."
         python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute
+        
+        echo ""
+        echo "✅ Done! Check $OUTPUT_DIR for sorted files"
+        echo ""
+        echo "📁 Folder structure:"
+        echo "   $OUTPUT_DIR/personal_media/    - Your photos & videos"
+        echo "   $OUTPUT_DIR/needs_review/      - Files needing manual review"
+        echo "   $OUTPUT_DIR/app_icons/         - Application icons"
+        echo "   $OUTPUT_DIR/game_assets/       - Game graphics"
+        echo "   $OUTPUT_DIR/thumbnails/        - Small thumbnails"
+        echo "   $OUTPUT_DIR/system_cache/      - Cache & duplicates"
+    else
+        echo ""
+        echo "ℹ️  Dry run completed. No files were moved."
     fi
 fi
-
-echo ""
-echo "✅ Done! Check $OUTPUT_DIR for sorted files"
-echo ""
-echo "📁 Folder structure:"
-echo "   $OUTPUT_DIR/personal_media/    - Your photos & videos"
-echo "   $OUTPUT_DIR/needs_review/      - Files needing manual review"
-echo "   $OUTPUT_DIR/app_icons/         - Application icons"
-echo "   $OUTPUT_DIR/game_assets/       - Game graphics"
-echo "   $OUTPUT_DIR/thumbnails/        - Small thumbnails"
-echo "   $OUTPUT_DIR/system_cache/      - Cache & duplicates"

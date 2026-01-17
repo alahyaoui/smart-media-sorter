@@ -83,8 +83,8 @@ DEFAULT_CONFIG = {
         ],
         "personal": [
             r"DSC_", r"IMG_\d{8}", r"VID_\d{8}", r"DCIM",
-            r"photo.*\d{4}", r"video.*\d{4}", 
-            r"\.(AVI|MP4|MOV|JPG|JPEG|PNG|HEIC)$"
+            r"photo.*\d{4}", r"video.*\d{4}",
+            r"\d{8}_\d{6}\.(mp4|avi|mov|MP4|AVI|MOV)$"
         ]
     },
     "thresholds": {
