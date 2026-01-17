@@ -21,6 +21,41 @@ import json
 from collections import defaultdict
 from datetime import datetime
 
+# ANSI Color codes for terminal output
+class Colors:
+    """ANSI color codes for prettier terminal output"""
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    DIM = '\033[2m'
+
+    @staticmethod
+    def disable():
+        """Disable colors (for piping or non-terminal output)"""
+        Colors.HEADER = ''
+        Colors.BLUE = ''
+        Colors.CYAN = ''
+        Colors.GREEN = ''
+        Colors.YELLOW = ''
+        Colors.RED = ''
+        Colors.ENDC = ''
+        Colors.BOLD = ''
+        Colors.UNDERLINE = ''
+        Colors.DIM = ''
+
+# Check if we should use colors
+# Enable for VSCode terminal (TERM_PROGRAM=vscode) or regular terminals
+if os.environ.get('TERM_PROGRAM') == 'vscode' or sys.stdout.isatty():
+    pass  # Colors enabled
+else:
+    Colors.disable()
+
 # Default configuration
 DEFAULT_CONFIG = {
     "source_dir": "./quarantine",
@@ -70,12 +105,14 @@ class MediaSorter:
         self.duplicates = defaultdict(list)
         self.errors = []
         
-    def get_file_hash(self, filepath, sample_size=8192):
-        """Quick hash of file for duplicate detection"""
+    def get_file_hash(self, filepath):
+        """Calculate hash of entire file for accurate duplicate detection"""
         try:
             hasher = hashlib.md5()
             with open(filepath, 'rb') as f:
-                hasher.update(f.read(sample_size))
+                # Read in chunks to handle large files efficiently
+                for chunk in iter(lambda: f.read(65536), b''):
+                    hasher.update(chunk)
             return hasher.hexdigest()
         except Exception as e:
             self.errors.append(f"Hash error for {filepath}: {e}")
@@ -217,6 +254,20 @@ class MediaSorter:
         
         return 'review'
     
+    def check_output_dirs(self):
+        """Check if output directories exist and have files"""
+        output_base = self.config['output_dir']
+        if not os.path.exists(output_base):
+            return False, 0
+        
+        total_existing = 0
+        for category_dir in self.config['categories'].values():
+            cat_path = os.path.join(output_base, category_dir)
+            if os.path.exists(cat_path):
+                total_existing += len([f for f in os.listdir(cat_path) if os.path.isfile(os.path.join(cat_path, f))])
+        
+        return True, total_existing
+    
     def create_output_dirs(self):
         """Create all output directories"""
         output_base = self.config['output_dir']
@@ -227,27 +278,46 @@ class MediaSorter:
         """Process all files in source directory"""
         source_dir = self.config['source_dir']
         
-        print(f"{'[DRY RUN] ' if dry_run else ''}Starting classification...")
-        print(f"Source: {source_dir}")
-        print(f"Output: {self.config['output_dir']}\n")
+        # Print header
+        print(f"\n{Colors.BOLD}{'═' * 70}{Colors.ENDC}")
+        if dry_run:
+            print(f"{Colors.YELLOW}{Colors.BOLD}🔍 DRY RUN MODE{Colors.ENDC} {Colors.DIM}(preview only - no files will be moved){Colors.ENDC}")
+        else:
+            print(f"{Colors.GREEN}{Colors.BOLD}🚀 LIVE MODE{Colors.ENDC} {Colors.DIM}(files will be moved){Colors.ENDC}")
+        print(f"{Colors.BOLD}{'═' * 70}{Colors.ENDC}\n")
+        
+        # Check for existing output
+        exists, existing_count = self.check_output_dirs()
+        if exists and existing_count > 0:
+            print(f"{Colors.YELLOW}⚠️  Warning:{Colors.ENDC} Output directory already contains {Colors.BOLD}{existing_count}{Colors.ENDC} files")
+            print(f"{Colors.DIM}   Files will be added to existing categories{Colors.ENDC}\n")
+        
+        print(f"{Colors.CYAN}📂 Source:{Colors.ENDC}  {Colors.BOLD}{source_dir}{Colors.ENDC}")
+        print(f"{Colors.CYAN}📁 Output:{Colors.ENDC}  {Colors.BOLD}{self.config['output_dir']}{Colors.ENDC}\n")
         
         # Get all files
+        print(f"{Colors.DIM}Scanning directory...{Colors.ENDC}")
         files = list(Path(source_dir).rglob('*'))
         file_list = [f for f in files if f.is_file()]
         total_files = len(file_list)
         
         if total_files == 0:
-            print(f"No files found in {source_dir}")
+            print(f"{Colors.RED}❌ No files found in {source_dir}{Colors.ENDC}")
             return
         
-        print(f"Found {total_files} files to process\n")
+        print(f"{Colors.GREEN}✓{Colors.ENDC} Found {Colors.BOLD}{total_files}{Colors.ENDC} files to process\n")
+        print(f"{Colors.DIM}{'─' * 70}{Colors.ENDC}")
         
         processed = 0
         for filepath in file_list:
             processed += 1
             
             if processed % 100 == 0 or (verbose and processed % 10 == 0):
-                print(f"Progress: {processed}/{total_files} ({processed*100//total_files}%)")
+                percentage = processed * 100 // total_files
+                bar_length = 30
+                filled = int(bar_length * processed / total_files)
+                bar = '█' * filled + '░' * (bar_length - filled)
+                print(f"\r{Colors.CYAN}Progress:{Colors.ENDC} [{bar}] {Colors.BOLD}{percentage}%{Colors.ENDC} ({processed}/{total_files})", end='', flush=True)
             
             # Check for duplicates
             file_hash = self.get_file_hash(str(filepath))
@@ -285,26 +355,59 @@ class MediaSorter:
     
     def print_results(self, total_files, dry_run):
         """Print classification results"""
-        print("\n" + "="*60)
-        print("CLASSIFICATION RESULTS:")
-        print("="*60)
+        print(f"\n\n{Colors.BOLD}{'═' * 70}{Colors.ENDC}")
+        print(f"{Colors.HEADER}{Colors.BOLD}📊 CLASSIFICATION RESULTS{Colors.ENDC}")
+        print(f"{Colors.BOLD}{'═' * 70}{Colors.ENDC}\n")
+        
+        # Category icons
+        icons = {
+            'personal': '📸',
+            'app_icons': '📱',
+            'game_assets': '🎮',
+            'thumbnails': '🖼️',
+            'system_cache': '🗑️',
+            'duplicates': '🔄',
+            'review': '❓'
+        }
         
         for category, count in sorted(self.stats.items(), key=lambda x: x[1], reverse=True):
             percentage = (count * 100) / total_files if total_files > 0 else 0
-            print(f"{category:20s}: {count:6d} files ({percentage:5.1f}%)")
+            icon = icons.get(category, '📄')
+            
+            # Color based on category
+            if category == 'personal':
+                color = Colors.GREEN
+            elif category in ['duplicates', 'system_cache']:
+                color = Colors.DIM
+            elif category == 'review':
+                color = Colors.YELLOW
+            else:
+                color = Colors.BLUE
+            
+            # Create percentage bar
+            bar_length = 20
+            filled = int(bar_length * percentage / 100)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            
+            print(f"{icon} {color}{category:20s}{Colors.ENDC}: {Colors.BOLD}{count:6d}{Colors.ENDC} files [{bar}] {percentage:5.1f}%")
         
-        print("="*60)
-        print(f"Total processed: {total_files} files")
+        print(f"\n{Colors.BOLD}{'─' * 70}{Colors.ENDC}")
+        print(f"{Colors.BOLD}Total processed:{Colors.ENDC} {Colors.CYAN}{total_files}{Colors.ENDC} files")
         
         if self.errors:
-            print(f"\n⚠️  {len(self.errors)} errors occurred")
+            print(f"\n{Colors.RED}⚠️  {len(self.errors)} errors occurred:{Colors.ENDC}")
             if len(self.errors) <= 10:
                 for error in self.errors:
-                    print(f"  - {error}")
+                    print(f"  {Colors.DIM}•{Colors.ENDC} {error}")
         
         if dry_run:
-            print("\n⚠️  This was a DRY RUN - no files were moved")
-            print("Run with --execute to actually move files")
+            print(f"\n{Colors.YELLOW}{Colors.BOLD}⚠️  DRY RUN COMPLETE{Colors.ENDC} {Colors.DIM}- No files were moved{Colors.ENDC}")
+            print(f"{Colors.CYAN}💡 Tip:{Colors.ENDC} Run with {Colors.BOLD}--execute{Colors.ENDC} to actually move files")
+        else:
+            print(f"\n{Colors.GREEN}{Colors.BOLD}✅ SORT COMPLETE!{Colors.ENDC}")
+            print(f"{Colors.CYAN}📁 Output:{Colors.ENDC} {self.config['output_dir']}")
+        
+        print(f"{Colors.BOLD}{'═' * 70}{Colors.ENDC}\n")
 
 
 def load_config(config_file):
@@ -358,8 +461,13 @@ Examples:
                        help='Verbose output')
     parser.add_argument('--generate-config', action='store_true',
                        help='Generate default config.json file')
+    parser.add_argument('--no-color', action='store_true',
+                       help='Disable colored output')
     
     args = parser.parse_args()
+    
+    if args.no_color:
+        Colors.disable()
     
     if args.generate_config:
         save_default_config()
