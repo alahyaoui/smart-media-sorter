@@ -1,0 +1,69 @@
+{
+  "source_dir": "./quarantine",
+  "output_dir": "./processed",
+  "categories": {
+    "personal": "personal_media",
+    "app_icons": "app_icons",
+    "game_assets": "game_assets",
+    "thumbnails": "thumbnails",
+    "system_cache": "system_cache",
+    "review": "needs_review"
+  },
+  "patterns": {
+    "app_icons": [
+      "icon",
+      "logo",
+      "sprite",
+      "badge",
+      "button",
+      "bg_",
+      "background",
+      "launcher",
+      "drawable",
+      "banner",
+      "toolbar",
+      "menu",
+      "notification"
+    ],
+    "game_assets": [
+      "game",
+      "level",
+      "character",
+      "weapon",
+      "enemy",
+      "powerup",
+      "coin",
+      "_art",
+      "texture",
+      "tile",
+      "monster",
+      "zombie"
+    ],
+    "cache": [
+      "cache",
+      "thumb",
+      "scaled",
+      "temp",
+      "tmp",
+      "\\.png\\.xmp$",
+      "r\\d+_\\d+_orig",
+      "r\\d+_\\d+_scaled",
+      "_\\d+x\\d+\\.png$"
+    ],
+    "personal": [
+      "DSC_",
+      "IMG_\\d{8}",
+      "VID_\\d{8}",
+      "DCIM",
+      "photo.*\\d{4}",
+      "video.*\\d{4}",
+      "\\.(AVI|MP4|MOV|JPG|JPEG|PNG|HEIC)$"
+    ]
+  },
+  "thresholds": {
+    "icon_max_dimension": 256,
+    "thumbnail_max_dimension": 200,
+    "min_photo_dimension": 800,
+    "min_video_size_mb": 5
+  }
+}
