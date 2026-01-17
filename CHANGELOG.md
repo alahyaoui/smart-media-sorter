@@ -5,6 +5,21 @@ All notable changes to Smart Media Sorter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-01-17
+
+### 🐛 Bug Fixes
+- **Critical**: Fixed duplicate detection causing false positives
+  - Changed from 8KB sample hashing to full-file hashing with 64KB chunks
+  - Prevents valid photos/videos from being misclassified as system_cache
+  - Improves accuracy but may be slightly slower for very large files
+- Fixed color output in VSCode integrated terminal
+  - Added TERM_PROGRAM environment variable detection
+  - Added `--no-color` flag for terminals without color support
+
+### 🎨 Improvements
+- Enhanced terminal compatibility across different environments
+- Better duplicate detection reliability
+
 ## [1.0.0] - 2026-01-17
 
 ### 🎉 Initial Release
