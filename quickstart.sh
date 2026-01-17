@@ -55,7 +55,8 @@ if [[ $DRY_RUN =~ ^[Nn]$ ]]; then
 else
     echo ""
     echo "🔍 Running DRY RUN (preview only)..."
-    python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR"
+    CACHE_FILE="/tmp/media-sorter-cache-$$.json"
+    python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --save-cache "$CACHE_FILE"
     
     echo ""
     read -p "Execute the sort for real? [y/N]: " EXECUTE
@@ -63,7 +64,10 @@ else
     if [[ $EXECUTE =~ ^[Yy]$ ]]; then
         echo ""
         echo "🚀 Running LIVE sort (moving files)..."
-        python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute
+        python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute --use-cache "$CACHE_FILE"
+        
+        # Clean up cache file
+        rm -f "$CACHE_FILE"
         
         echo ""
         echo "✅ Done! Check $OUTPUT_DIR for sorted files"
@@ -76,6 +80,8 @@ else
         echo "   $OUTPUT_DIR/thumbnails/        - Small thumbnails"
         echo "   $OUTPUT_DIR/system_cache/      - Cache & duplicates"
     else
+        # Clean up cache file
+        rm -f "$CACHE_FILE"
         echo ""
         echo "ℹ️  Dry run completed. No files were moved."
     fi

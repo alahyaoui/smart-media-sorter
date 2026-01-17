@@ -1,0 +1,7 @@
+# Optional dependencies for enhanced functionality
+# The script works without these, but they improve accuracy
+
+# python-magic: Better MIME type detection for unknown file types
+# Install on Ubuntu/Debian: sudo apt install python3-magic
+# Install via pip: pip install python-magic
+python-magic; sys_platform == 'linux'

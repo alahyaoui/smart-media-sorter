@@ -14,10 +14,16 @@ import shutil
 from pathlib import Path
 import hashlib
 import re
-import imghdr
+try:
+    import magic
+    HAS_MAGIC = True
+except ImportError:
+    HAS_MAGIC = False
+    # python-magic is optional - script will work without it using mimetypes module
 import mimetypes
 import argparse
 import json
+import time
 from collections import defaultdict
 from datetime import datetime
 
@@ -104,6 +110,7 @@ class MediaSorter:
         self.stats = defaultdict(int)
         self.duplicates = defaultdict(list)
         self.errors = []
+        self.classifications = {}  # filepath -> category mapping
         
     def get_file_hash(self, filepath):
         """Calculate hash of entire file for accurate duplicate detection"""
@@ -227,10 +234,11 @@ class MediaSorter:
         
         # Get MIME type
         mime, _ = mimetypes.guess_type(filepath)
-        if not mime:
-            img_type = imghdr.what(filepath)
-            if img_type:
-                mime = f'image/{img_type}'
+        if not mime and HAS_MAGIC:
+            try:
+                mime = magic.from_file(filepath, mime=True)
+            except Exception:
+                pass
         
         if not mime:
             return 'review'
@@ -274,7 +282,37 @@ class MediaSorter:
         for category_dir in self.config['categories'].values():
             os.makedirs(os.path.join(output_base, category_dir), exist_ok=True)
     
-    def process_files(self, dry_run=True, verbose=False):
+    def save_cache(self, cache_file):
+        """Save classification results to cache file"""
+        cache_data = {
+            'timestamp': datetime.now().isoformat(),
+            'source_dir': self.config['source_dir'],
+            'output_dir': self.config['output_dir'],
+            'classifications': self.classifications,
+            'stats': dict(self.stats)
+        }
+        with open(cache_file, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+    
+    def load_cache(self, cache_file):
+        """Load classification results from cache file"""
+        if not os.path.exists(cache_file):
+            return False
+        
+        with open(cache_file, 'r') as f:
+            cache_data = json.load(f)
+        
+        # Verify cache is for same directories
+        if (cache_data.get('source_dir') != self.config['source_dir'] or
+            cache_data.get('output_dir') != self.config['output_dir']):
+            print(f"{Colors.YELLOW}⚠️  Cache is for different directories, ignoring{Colors.ENDC}")
+            return False
+        
+        self.classifications = cache_data.get('classifications', {})
+        self.stats = defaultdict(int, cache_data.get('stats', {}))
+        return True
+    
+    def process_files(self, dry_run=True, verbose=False, use_cache=False, save_cache_file=None):
         """Process all files in source directory"""
         source_dir = self.config['source_dir']
         
@@ -306,30 +344,46 @@ class MediaSorter:
             return
         
         print(f"{Colors.GREEN}✓{Colors.ENDC} Found {Colors.BOLD}{total_files}{Colors.ENDC} files to process\n")
-        print(f"{Colors.DIM}{'─' * 70}{Colors.ENDC}")
+        
+        # Check if using cache
+        if use_cache and self.classifications:
+            print(f"{Colors.CYAN}📦 Using cached classifications{Colors.ENDC}")
+            print(f"{Colors.DIM}{'─' * 70}{Colors.ENDC}\n")
+        else:
+            print(f"{Colors.DIM}{'─' * 70}{Colors.ENDC}")
+        
+        # Start timer
+        start_time = time.time()
         
         processed = 0
         for filepath in file_list:
             processed += 1
+            filepath_str = str(filepath)
             
             if processed % 100 == 0 or (verbose and processed % 10 == 0):
                 percentage = processed * 100 // total_files
                 bar_length = 30
                 filled = int(bar_length * processed / total_files)
                 bar = '█' * filled + '░' * (bar_length - filled)
-                print(f"\r{Colors.CYAN}Progress:{Colors.ENDC} [{bar}] {Colors.BOLD}{percentage}%{Colors.ENDC} ({processed}/{total_files})", end='', flush=True)
+                action = "Moving" if not dry_run else "Classifying"
+                print(f"\r{Colors.CYAN}{action}:{Colors.ENDC} [{bar}] {Colors.BOLD}{percentage}%{Colors.ENDC} ({processed}/{total_files})", end='', flush=True)
             
-            # Check for duplicates
-            file_hash = self.get_file_hash(str(filepath))
-            if file_hash and file_hash in self.duplicates and len(self.duplicates[file_hash]) > 0:
-                self.stats['duplicates'] += 1
-                category = 'system_cache'
+            # Use cached classification or classify now
+            if use_cache and filepath_str in self.classifications:
+                category = self.classifications[filepath_str]
             else:
-                if file_hash:
-                    self.duplicates[file_hash].append(str(filepath))
-                category = self.classify_file(str(filepath))
-            
-            self.stats[category] += 1
+                # Check for duplicates
+                file_hash = self.get_file_hash(filepath_str)
+                if file_hash and file_hash in self.duplicates and len(self.duplicates[file_hash]) > 0:
+                    self.stats['duplicates'] += 1
+                    category = 'system_cache'
+                else:
+                    if file_hash:
+                        self.duplicates[file_hash].append(filepath_str)
+                    category = self.classify_file(filepath_str)
+                
+                self.stats[category] += 1
+                self.classifications[filepath_str] = category
             
             # Move file
             if not dry_run:
@@ -351,9 +405,15 @@ class MediaSorter:
                 except Exception as e:
                     self.errors.append(f"Move error for {filepath}: {e}")
         
-        self.print_results(total_files, dry_run)
+        elapsed_time = time.time() - start_time
+        
+        # Save cache if requested
+        if save_cache_file and not use_cache:
+            self.save_cache(save_cache_file)
+        
+        self.print_results(total_files, dry_run, elapsed_time)
     
-    def print_results(self, total_files, dry_run):
+    def print_results(self, total_files, dry_run, elapsed_time):
         """Print classification results"""
         print(f"\n\n{Colors.BOLD}{'═' * 70}{Colors.ENDC}")
         print(f"{Colors.HEADER}{Colors.BOLD}📊 CLASSIFICATION RESULTS{Colors.ENDC}")
@@ -389,10 +449,25 @@ class MediaSorter:
             filled = int(bar_length * percentage / 100)
             bar = '█' * filled + '░' * (bar_length - filled)
             
-            print(f"{icon} {color}{category:20s}{Colors.ENDC}: {Colors.BOLD}{count:6d}{Colors.ENDC} files [{bar}] {percentage:5.1f}%")
+            print(f"{icon}  {color}{category:20s}{Colors.ENDC}: {Colors.BOLD}{count:6d}{Colors.ENDC} files [{bar}] {percentage:5.1f}%")
         
         print(f"\n{Colors.BOLD}{'─' * 70}{Colors.ENDC}")
         print(f"{Colors.BOLD}Total processed:{Colors.ENDC} {Colors.CYAN}{total_files}{Colors.ENDC} files")
+        
+        # Format elapsed time in human-readable format
+        if elapsed_time < 60:
+            time_str = f"{elapsed_time:.2f} seconds"
+        elif elapsed_time < 3600:
+            minutes = int(elapsed_time // 60)
+            seconds = elapsed_time % 60
+            time_str = f"{minutes}m {seconds:.1f}s"
+        else:
+            hours = int(elapsed_time // 3600)
+            minutes = int((elapsed_time % 3600) // 60)
+            seconds = elapsed_time % 60
+            time_str = f"{hours}h {minutes}m {seconds:.0f}s"
+        
+        print(f"{Colors.BOLD}Processing time:{Colors.ENDC} {Colors.CYAN}{time_str}{Colors.ENDC}")
         
         if self.errors:
             print(f"\n{Colors.RED}⚠️  {len(self.errors)} errors occurred:{Colors.ENDC}")
@@ -463,6 +538,10 @@ Examples:
                        help='Generate default config.json file')
     parser.add_argument('--no-color', action='store_true',
                        help='Disable colored output')
+    parser.add_argument('--use-cache', metavar='FILE',
+                       help='Use cached classifications from previous dry run')
+    parser.add_argument('--save-cache', metavar='FILE',
+                       help='Save classifications to cache file for faster execution')
     
     args = parser.parse_args()
     
@@ -489,8 +568,24 @@ Examples:
     
     # Create sorter and run
     sorter = MediaSorter(config)
-    sorter.create_output_dirs()
-    sorter.process_files(dry_run=not args.execute, verbose=args.verbose)
+    
+    # Load cache if specified
+    use_cache = False
+    if args.use_cache:
+        use_cache = sorter.load_cache(args.use_cache)
+        if not use_cache:
+            print(f"{Colors.RED}Failed to load cache from {args.use_cache}{Colors.ENDC}")
+            return 1
+    
+    if args.execute:
+        sorter.create_output_dirs()
+    
+    sorter.process_files(
+        dry_run=not args.execute,
+        verbose=args.verbose,
+        use_cache=use_cache,
+        save_cache_file=args.save_cache
+    )
     
     return 0
 

@@ -54,8 +54,22 @@ The tool uses multiple intelligent heuristics:
 
 ## 📋 Requirements
 
-- **Python 3.7+** (uses only standard library - no external dependencies!)
+- **Python 3.7+** (uses only standard library)
 - Works on Linux, macOS, and Windows
+
+### Optional Dependencies
+
+For improved file type detection, you can optionally install:
+
+```bash
+# Ubuntu/Debian
+sudo apt install python3-magic
+
+# Other systems
+pip install python-magic
+```
+
+**Note**: The script works perfectly fine without `python-magic` using Python's built-in `mimetypes` module. Installing it just provides better detection for unusual file types.
 
 ## 🔧 Installation
 
