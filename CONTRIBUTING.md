@@ -41,7 +41,7 @@ Different camera brands use different naming patterns. Add yours!
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/smart-media-sorter.git
+git clone https://github.com/alahyaoui/smart-media-sorter.git
 cd smart-media-sorter
 
 # No dependencies needed - uses Python standard library!

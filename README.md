@@ -61,7 +61,7 @@ The tool uses multiple intelligent heuristics:
 
 ```bash
 # Clone or download the repository
-git clone https://github.com/yourusername/smart-media-sorter.git
+git clone https://github.com/alahyaoui/smart-media-sorter.git
 cd smart-media-sorter
 
 # Make executable (optional)

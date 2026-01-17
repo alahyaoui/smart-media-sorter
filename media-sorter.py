@@ -5,7 +5,7 @@ Separates family/personal media from app icons, game assets, and cached files
 
 Author: Created to solve the quarantine folder problem
 License: MIT
-Repository: https://github.com/yourusername/smart-media-sorter
+Repository: https://github.com/alahyaoui/smart-media-sorter
 """
 
 import os
