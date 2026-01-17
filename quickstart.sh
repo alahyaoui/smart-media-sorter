@@ -7,7 +7,7 @@ echo "=================================================="
 echo ""
 
 # Check if Python 3 is installed
-if ! command -v python3 &> /dev/null; then
+if ! which python3 > /dev/null 2>&1; then
     echo "❌ Python 3 is not installed. Please install Python 3.7 or higher."
     exit 1
 fi
@@ -51,11 +51,11 @@ if [[ $DRY_RUN =~ ^[Nn]$ ]]; then
     
     echo ""
     echo "🚀 Running LIVE sort (moving files)..."
-    python3 media-sorter.py --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute
+    python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute
 else
     echo ""
     echo "🔍 Running DRY RUN (preview only)..."
-    python3 media-sorter.py --source "$SOURCE_DIR" --output "$OUTPUT_DIR"
+    python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR"
     
     echo ""
     read -p "Execute the sort for real? [y/N]: " EXECUTE
@@ -63,7 +63,7 @@ else
     if [[ $EXECUTE =~ ^[Yy]$ ]]; then
         echo ""
         echo "🚀 Running LIVE sort (moving files)..."
-        python3 media-sorter.py --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute
+        python3 "$(dirname "$0")/media-sorter.py" --source "$SOURCE_DIR" --output "$OUTPUT_DIR" --execute
     fi
 fi
 
